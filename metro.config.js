@@ -13,7 +13,7 @@ config.resolver.blockList = [
   /\/Music\/.*/,
   /\/Applications\/.*/,
   /\/Downloads\/.*/,
-  /\/Documents\/.*/,
+  /\/Documents\/(?!GitHub\/ZTK\/).*/,
   /\/Desktop\/.*/,
   /\/foundry-f23\/.*/,
   /\/foundry-smart-contract-lottery-f23\/.*/,
