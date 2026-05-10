@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { Audio } from "expo-av";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Platform,
   Pressable,
@@ -15,6 +16,7 @@ import {
   View
 } from "react-native";
 import lessonData from "./src/data/lessons/em_am_test.json";
+import StringPractice from "./src/components/StringPractice";
 
 const COLORS = {
   softGold: "#F7DB75",
@@ -76,6 +78,28 @@ const CHORD_SHAPES = {
   ]
 };
 
+const STRUM_GUIDE_STRINGS = [
+  { id: 6, label: "E", thickness: 3.2, color: "#f0f0f0" },
+  { id: 5, label: "A", thickness: 2.6, color: "#e0e0e0" },
+  { id: 4, label: "D", thickness: 2.1, color: "#d8d8d8" },
+  { id: 3, label: "G", thickness: 1.6, color: "#c9a050" },
+  { id: 2, label: "B", thickness: 1.2, color: "#c9a050" },
+  { id: 1, label: "e", thickness: 0.9, color: "#c4913a" }
+];
+
+const FB_H = 164;
+const FB_STR_TOP = 28;
+const FB_STR_GAP = 22;
+const FB_STR_YS = STRUM_GUIDE_STRINGS.map((_, index) => FB_STR_TOP + index * FB_STR_GAP);
+const BLOCK_W = 54;
+const BLOCK_TOP = FB_STR_YS[0] - 8;
+const BLOCK_BOT = FB_STR_YS[5] + 14;
+const BLOCK_H = BLOCK_BOT - BLOCK_TOP;
+const CHORD_ACTIVE = {
+  Em: [true, true, true, true, true, true],
+  Am: [false, true, true, true, true, true]
+};
+
 function centsOff(frequency, midiNote) {
   const targetFreq = 440 * Math.pow(2, (midiNote - 69) / 12);
   return Math.round(1200 * Math.log2(frequency / targetFreq));
@@ -89,6 +113,40 @@ const LESSON = {
   sourceMidi: lessonData.sourceMidi,
   targets: lessonData.targets
 };
+
+const ALL_MODULES = [
+  { id: 1, type: "tutorial", title: "Em & Am", subtitle: "Fundamentals", emoji: "🎸", hasRealLesson: true },
+  { id: 2, type: "tutorial", title: "G & D Chords", subtitle: "Open Position", emoji: "🎼", hasRealLesson: false },
+  { id: 3, type: "tutorial", title: "Barre Chords", subtitle: "Level Up", emoji: "⭐", hasRealLesson: false },
+  { id: 4, type: "workout", title: "Chord Changes", subtitle: "Speed Drill", emoji: "⚡", hasRealLesson: false },
+  { id: 5, type: "workout", title: "Strumming", subtitle: "Rhythm Training", emoji: "🥁", hasRealLesson: false },
+  { id: 6, type: "workout", title: "Scale Runs", subtitle: "Finger Strength", emoji: "🎯", hasRealLesson: false },
+  { id: 7, type: "song", title: "First Song", subtitle: "Put It Together", emoji: "🎤", hasRealLesson: false },
+  { id: 8, type: "song", title: "Wonderwall", subtitle: "Oasis", emoji: "🎶", hasRealLesson: false },
+  { id: 9, type: "song", title: "Knockin' On Heaven", subtitle: "Bob Dylan", emoji: "🚪", hasRealLesson: false }
+];
+
+const TABS = [
+  { id: "learn", label: "Learn", emoji: "📖", world: "JOURNEY", title: "Zero To Kumziz" },
+  { id: "workouts", label: "Workouts", emoji: "⚡", world: "GYM", title: "Practice Drills" },
+  { id: "songs", label: "Songs", emoji: "🎵", world: "STAGE", title: "Your Setlist" }
+];
+
+function modulesForTab(tabId) {
+  if (tabId === "workouts") {
+    return ALL_MODULES.filter((moduleItem) => moduleItem.type === "workout");
+  }
+  if (tabId === "songs") {
+    return ALL_MODULES.filter((moduleItem) => moduleItem.type === "song");
+  }
+  return ALL_MODULES;
+}
+
+function getUnlockedIds(modules, completedModules) {
+  return modules
+    .filter((moduleItem, index) => index === 0 || completedModules[modules[index - 1].id])
+    .map((moduleItem) => moduleItem.id);
+}
 
 function classifyHit(deltaSeconds, expected, played) {
   const expectedPitchClasses = [...new Set(expected.map((note) => note % 12))];
@@ -166,6 +224,16 @@ function scoreForLabel(label) {
     return 1;
   }
   return 0;
+}
+
+function resultColor(result) {
+  if (result === "perfect") {
+    return "#2FBF71";
+  }
+  if (result === "good") {
+    return COLORS.softGold;
+  }
+  return "#C14953";
 }
 
 function getTargetLabel(target) {
@@ -439,6 +507,218 @@ function ChordDiagram({ shape, label }) {
   );
 }
 
+function PathDots({ from, to, unlocked }) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const dotSize = 10;
+  const spacing = 20;
+  const edge = 46;
+  const count = Math.floor(Math.max(0, dist - edge * 2) / spacing);
+  if (count < 1) {
+    return null;
+  }
+  const color = unlocked ? "#5C4512" : "#242424";
+  return (
+    <>
+      {Array.from({ length: count }, (_, index) => {
+        const t = (edge + index * spacing + spacing / 2) / dist;
+        return (
+          <View
+            key={index}
+            style={{
+              position: "absolute",
+              left: from.x + dx * t - dotSize / 2,
+              top: from.y + dy * t - dotSize / 2,
+              width: dotSize,
+              height: dotSize,
+              borderRadius: dotSize / 2,
+              backgroundColor: color
+            }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function ModuleNode({ mod, nodeState, center, size, onPress }) {
+  const anim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (nodeState !== "available") {
+      return undefined;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1.1, duration: 650, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 1.0, duration: 650, useNativeDriver: true })
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [nodeState, anim]);
+
+  const bgColor = nodeState === "locked" ? "#1C1C1C" : nodeState === "completed" ? "#132613" : "#0C2B0C";
+  const borderColor = nodeState === "locked" ? "#303030" : nodeState === "completed" ? COLORS.softGold : "#2FBF71";
+  const glowColor = nodeState === "locked" ? "transparent" : nodeState === "completed" ? COLORS.softGold : "#2FBF71";
+  const icon = nodeState === "locked" ? "🔒" : nodeState === "completed" ? "✅" : mod.emoji;
+
+  return (
+    <Animated.View
+      style={{
+        position: "absolute",
+        left: center.x - size / 2,
+        top: center.y - size / 2,
+        transform: [{ scale: anim }],
+        shadowColor: glowColor,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: nodeState !== "locked" ? 0.85 : 0,
+        shadowRadius: 16,
+        elevation: nodeState !== "locked" ? 10 : 2
+      }}
+    >
+      <Pressable
+        onPress={onPress}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: bgColor,
+          borderWidth: nodeState === "available" ? 4 : 3,
+          borderColor,
+          alignItems: "center",
+          justifyContent: "center"
+        }}
+      >
+        <Text style={{ fontSize: nodeState === "locked" ? 24 : 30 }}>{icon}</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function NodeLabel({ mod, nodeState, stars, center, nodeSize, screenWidth }) {
+  const labelWidth = 120;
+  const left = Math.max(6, Math.min(center.x - labelWidth / 2, screenWidth - labelWidth - 6));
+  return (
+    <View
+      style={{
+        position: "absolute",
+        left,
+        top: center.y + nodeSize / 2 + 10,
+        width: labelWidth,
+        alignItems: "center"
+      }}
+    >
+      <Text style={{ color: nodeState === "locked" ? "#3A3A3A" : COLORS.white, fontWeight: "700", fontSize: 13, textAlign: "center" }}>
+        {mod.title}
+      </Text>
+      <Text style={{ color: nodeState === "locked" ? "#2C2C2C" : "#ADADAD", fontSize: 11, textAlign: "center" }}>
+        {mod.subtitle}
+      </Text>
+      {nodeState === "completed" && stars > 0 && (
+        <Text style={{ color: COLORS.softGold, fontSize: 14, marginTop: 3 }}>
+          {"★".repeat(stars)}{"☆".repeat(3 - stars)}
+        </Text>
+      )}
+      {nodeState === "available" && (
+        <View style={{ marginTop: 4, borderWidth: 1, borderColor: "#2FBF71", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 }}>
+          <Text style={{ color: "#2FBF71", fontSize: 9, fontWeight: "700", letterSpacing: 1 }}>START</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function ModuleNodeWithLabel({ mod, nodeState, stars, center, nodeSize, screenWidth, onPress }) {
+  return (
+    <>
+      <ModuleNode mod={mod} nodeState={nodeState} center={center} size={nodeSize} onPress={onPress} />
+      <NodeLabel mod={mod} nodeState={nodeState} stars={stars} center={center} nodeSize={nodeSize} screenWidth={screenWidth} />
+    </>
+  );
+}
+
+function PathScreen({ modules, tabConfig, completedModules, onSelectModule }) {
+  const { width } = useWindowDimensions();
+  const nodeSize = 80;
+  const half = nodeSize / 2;
+  const sidePad = 28;
+  const leftX = sidePad + half;
+  const rightX = width - sidePad - half;
+
+  const unlockedIds = getUnlockedIds(modules, completedModules);
+
+  const nodeCenters = modules.map((_, index) => ({
+    x: index % 2 === 0 ? rightX : leftX,
+    y: 70 + index * 180
+  }));
+
+  const totalHeight = nodeCenters.length > 0 ? nodeCenters[nodeCenters.length - 1].y + half + 110 : 300;
+  const earnedStars = modules.reduce((sum, moduleItem) => sum + (completedModules[moduleItem.id]?.stars || 0), 0);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+      <View style={pathSt.header}>
+        <View>
+          <Text style={pathSt.worldLabel}>{tabConfig.world}</Text>
+          <Text style={pathSt.worldTitle}>{tabConfig.title}</Text>
+        </View>
+        <View style={pathSt.starsBox}>
+          <Text style={pathSt.starIcon}>★</Text>
+          <Text style={pathSt.starsCount}>{earnedStars} / {modules.length * 3}</Text>
+        </View>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ height: totalHeight }}>
+        {modules.slice(0, -1).map((moduleItem, index) => (
+          <PathDots
+            key={`d${index}`}
+            from={nodeCenters[index]}
+            to={nodeCenters[index + 1]}
+            unlocked={unlockedIds.includes(moduleItem.id)}
+          />
+        ))}
+        {modules.map((moduleItem, index) => {
+          const center = nodeCenters[index];
+          const isUnlocked = unlockedIds.includes(moduleItem.id);
+          const isCompleted = !!completedModules[moduleItem.id];
+          const nodeState = !isUnlocked ? "locked" : isCompleted ? "completed" : "available";
+          return (
+            <ModuleNodeWithLabel
+              key={moduleItem.id}
+              mod={moduleItem}
+              nodeState={nodeState}
+              stars={completedModules[moduleItem.id]?.stars || 0}
+              center={center}
+              nodeSize={nodeSize}
+              screenWidth={width}
+              onPress={() => onSelectModule(moduleItem, nodeState)}
+            />
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+function TabBar({ activeTab, onTabChange }) {
+  return (
+    <View style={tabSt.bar}>
+      {TABS.map((tab) => {
+        const active = activeTab === tab.id;
+        return (
+          <Pressable key={tab.id} style={tabSt.tab} onPress={() => onTabChange(tab.id)}>
+            {active && <View style={tabSt.indicator} />}
+            <Text style={[tabSt.tabEmoji, active && tabSt.tabEmojiActive]}>{tab.emoji}</Text>
+            <Text style={[tabSt.tabLabel, active && tabSt.tabLabelActive]}>{tab.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function TuningScreen({ onBack }) {
   const [micStatus, setMicStatus] = useState("idle");
   const [liveNote, setLiveNote] = useState(null);
@@ -569,9 +849,13 @@ function TuningScreen({ onBack }) {
   );
 }
 
-function LandingScreen({ onStart, onTune }) {
+function LandingScreen({ onLesson, onPractice, onTune, onBack }) {
   return (
-    <View style={styles.screen}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.screen}>
+      <Pressable onPress={onBack} style={styles.backButton}>
+        <Text style={styles.backButtonText}>← Path</Text>
+      </Pressable>
+
       <View style={styles.hero}>
         <View style={styles.logoWrap}>
           <Animated.Image
@@ -584,26 +868,50 @@ function LandingScreen({ onStart, onTune }) {
         <Text style={styles.subtitle}>Play along, hit the target, earn your score.</Text>
       </View>
 
-      <View style={styles.lessonCard}>
-        <Text style={styles.lessonCardTitle}>{LESSON.title}</Text>
-        <Text style={styles.lessonCardMeta}>MIDI: {LESSON.sourceMidi}</Text>
-        <Text style={styles.lessonCardMeta}>
-          {LESSON.targets.length} targets at {LESSON.bpm} BPM
-        </Text>
-        <Pressable onPress={onStart} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Start Lesson</Text>
-        </Pressable>
-        <Pressable onPress={onTune} style={[styles.secondaryButton, { marginTop: 8 }]}>
-          <Text style={styles.secondaryButtonText}>Chord Detector & Tuner</Text>
+      <Text style={styles.modulesHeading}>Choose a module</Text>
+
+      <View style={styles.moduleCard}>
+        <Text style={styles.moduleEmoji}>🎵</Text>
+        <View style={styles.moduleBody}>
+          <Text style={styles.moduleTitle}>Strum Along</Text>
+          <Text style={styles.moduleDesc}>Play Em → Am chord changes in real time. Hit targets and score points.</Text>
+          <Text style={styles.moduleTip}>Green = perfect · Yellow = close · Red = miss</Text>
+        </View>
+        <Pressable onPress={onLesson} style={styles.moduleBtn}>
+          <Text style={styles.moduleBtnText}>Start</Text>
         </Pressable>
       </View>
-    </View>
+
+      <View style={styles.moduleCard}>
+        <Text style={styles.moduleEmoji}>🎸</Text>
+        <View style={styles.moduleBody}>
+          <Text style={styles.moduleTitle}>String Practice</Text>
+          <Text style={styles.moduleDesc}>Pluck each Em string one by one, then strum the full chord.</Text>
+          <Text style={styles.moduleTip}>Green = ringing · Red = muted / missing</Text>
+        </View>
+        <Pressable onPress={onPractice} style={styles.moduleBtn}>
+          <Text style={styles.moduleBtnText}>Start</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.moduleCard}>
+        <Text style={styles.moduleEmoji}>🎯</Text>
+        <View style={styles.moduleBody}>
+          <Text style={styles.moduleTitle}>Chord Detector & Tuner</Text>
+          <Text style={styles.moduleDesc}>Live pitch and note detection for tuning and chord checking.</Text>
+          <Text style={styles.moduleTip}>Use this to warm up before lessons</Text>
+        </View>
+        <Pressable onPress={onTune} style={styles.moduleBtn}>
+          <Text style={styles.moduleBtnText}>Open</Text>
+        </Pressable>
+      </View>
+    </ScrollView>
   );
 }
 
 function LessonScreen({ onBack }) {
   const { width } = useWindowDimensions();
-  const targetX = Math.max(140, width * 0.3);
+  const strumX = Math.max(72, width * 0.2);
   const [isRunning, setRunning] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [lastJudgement, setLastJudgement] = useState(null);
@@ -1282,41 +1590,111 @@ function LessonScreen({ onBack }) {
         <Metric label="Miss" value={stats.miss} />
       </View>
 
-      <View style={styles.timelineFrame}>
-        <View style={[styles.targetRail, { left: targetX }]}>
-          <Animated.View style={[styles.targetBall, { transform: [{ scale: pulse }] }]} />
-          <Text style={styles.targetLabel}>Now</Text>
-        </View>
+      <View style={[styles.fretboard, { height: FB_H }]}> 
+        <View style={[StyleSheet.absoluteFill, styles.fretboardBg]} />
+        {Array.from({ length: 12 }, (_, fret) => (
+          <View key={fret} style={[styles.fretDecor, { left: strumX + 28 + fret * 68 }]} />
+        ))}
+
+        {STRUM_GUIDE_STRINGS.map((stringDef, index) => (
+          <View
+            key={stringDef.id}
+            style={[
+              styles.stringTrack,
+              {
+                top: FB_STR_YS[index] - stringDef.thickness / 2,
+                height: stringDef.thickness,
+                backgroundColor: stringDef.color
+              }
+            ]}
+          />
+        ))}
+
+        {STRUM_GUIDE_STRINGS.map((stringDef, index) => (
+          <View key={`label-${stringDef.id}`} style={[styles.strLabel, { top: FB_STR_YS[index] - 10 }]}>
+            <Text style={styles.strLabelText}>{stringDef.label}</Text>
+          </View>
+        ))}
+
+        <View style={[styles.strumLine, { left: strumX }]} />
+        <Animated.View
+          style={[
+            styles.strumBall,
+            { left: strumX - 11, top: FB_H / 2 - 11, transform: [{ scale: pulse }] }
+          ]}
+        />
+
         {LESSON.targets.map((target) => {
-          const x = targetX + (target.time - currentTime) * PIXELS_PER_SECOND;
-          if (x < -80 || x > width + 80) {
+          const x = strumX + (target.time - currentTime) * PIXELS_PER_SECOND - BLOCK_W / 2;
+          if (x < -BLOCK_W - 10 || x > width + 10) {
             return null;
           }
           const judgement = judgements[target.id];
-          // Only reveal the result after the NOW line has swept past this target.
-          const revealed = currentTime >= target.time;
-          const pillColor = revealed && judgement
-            ? judgement.result === "perfect"
-              ? "#2FBF71"
-              : judgement.result === "good"
-                ? "#7BC67E"
-                : "#C14953"
-            : COLORS.bronzeOlive;
+          const label = getTargetLabel(target);
+          const active = CHORD_ACTIVE[label] ?? [true, true, true, true, true, true];
+          const judgementColor = judgement ? resultColor(judgement.result) : null;
+          const borderColor = judgementColor || COLORS.bronzeOlive;
+
           return (
             <View
               key={target.id}
-              style={[styles.notePill, { left: x, backgroundColor: pillColor }]}
+              style={[
+                styles.chordBlock,
+                {
+                  left: x,
+                  top: BLOCK_TOP,
+                  height: BLOCK_H,
+                  width: BLOCK_W,
+                  backgroundColor: judgementColor ? `${judgementColor}30` : "#261800",
+                  borderColor
+                }
+              ]}
             >
-              <ChordDiagram
-                shape={CHORD_SHAPES[getTargetLabel(target)]}
-                label={getTargetLabel(target)}
-              />
-              {revealed && judgement && judgement.result === "miss" && judgement.detected && judgement.detected.length > 0 && (
-                <Text style={styles.notePillDetected}>
-                  {judgement.detected.map((m) => midiToNoteName(m)).join(" ")}
-                </Text>
+              {STRUM_GUIDE_STRINGS.map((stringDef, index) =>
+                active[index] ? (
+                  <View
+                    key={`${target.id}-${stringDef.id}`}
+                    style={[
+                      styles.chordDot,
+                      {
+                        position: "absolute",
+                        top: FB_STR_YS[index] - BLOCK_TOP - 5,
+                        left: BLOCK_W / 2 - 5,
+                        backgroundColor: borderColor
+                      }
+                    ]}
+                  />
+                ) : (
+                  <Text
+                    key={`${target.id}-${stringDef.id}`}
+                    style={[
+                      styles.chordMuteX,
+                      {
+                        position: "absolute",
+                        top: FB_STR_YS[index] - BLOCK_TOP - 9,
+                        left: BLOCK_W / 2 - 6
+                      }
+                    ]}
+                  >
+                    ×
+                  </Text>
+                )
               )}
             </View>
+          );
+        })}
+
+        {LESSON.targets.map((target) => {
+          const x = strumX + (target.time - currentTime) * PIXELS_PER_SECOND - BLOCK_W / 2;
+          if (x < -BLOCK_W - 10 || x > width + 10) {
+            return null;
+          }
+          const judgement = judgements[target.id];
+          const textColor = judgement ? resultColor(judgement.result) : COLORS.bronzeOlive;
+          return (
+            <Text key={`lbl-${target.id}`} style={[styles.chordLabelAbove, { left: x, color: textColor }]}>
+              {getTargetLabel(target)}
+            </Text>
           );
         })}
       </View>
@@ -1399,13 +1777,31 @@ function LessonScreen({ onBack }) {
         <Text style={styles.liveNoteText}>
           Live: {liveDetectedNote}{liveFrequency ? ` (${Math.round(liveFrequency)} Hz)` : ""}
         </Text>
-        <View style={styles.stringIndicatorRow}>
+        <View style={styles.stringBoardWrap}>
           {GUITAR_STRINGS.map((s, i) => {
             const active = liveDetectedMidis.some((m) => m % 12 === s.pitchClass);
+            const isWound = i < 3;
             return (
-              <View key={i} style={styles.stringIndicatorItem}>
-                <View style={[styles.stringIndicatorDot, active && styles.stringIndicatorDotActive]} />
-                <Text style={styles.stringIndicatorLabel}>{s.label.slice(0, -1)}</Text>
+              <View key={i} style={[styles.stringBoardRow, active && styles.stringBoardRowActive]}>
+                <View style={[styles.stringBoardLabelBox, active && styles.stringBoardLabelBoxActive]}>
+                  <Text style={[styles.stringBoardLabel, active && styles.stringBoardLabelActive]}>{s.label.slice(0, -1)}</Text>
+                </View>
+                <View style={styles.stringBoardTrack}>
+                  <View
+                    style={[
+                      styles.stringBoardWire,
+                      {
+                        height: isWound ? 3 : 2,
+                        backgroundColor: isWound ? "#c4913a" : "#d8d8d8",
+                        opacity: active ? 1 : 0.55
+                      }
+                    ]}
+                  />
+                  {active && <View style={styles.stringBoardPulse} />}
+                </View>
+                <View style={[styles.stringBoardStatus, active && styles.stringBoardStatusActive]}>
+                  <Text style={styles.stringBoardStatusIcon}>{active ? "✓" : "·"}</Text>
+                </View>
               </View>
             );
           })}
@@ -1436,20 +1832,174 @@ function Metric({ label, value }) {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState("landing");
+  const [screen, setScreen] = useState("path");
+  const [activeTab, setActiveTab] = useState("learn");
+  const [selectedModule, setSelectedModule] = useState(null);
+  const [completedModules, setCompletedModules] = useState({});
+
+  const currentTabConfig = TABS.find((tab) => tab.id === activeTab) || TABS[0];
+  const currentModules = modulesForTab(activeTab);
+
+  function recordCompletion(moduleId, stars) {
+    setCompletedModules((prev) => ({
+      ...prev,
+      [moduleId]: { stars: Math.max(stars, prev[moduleId]?.stars || 0) }
+    }));
+  }
+
+  function handleSelectModule(mod, nodeState) {
+    if (nodeState === "locked") {
+      const tabModules = modulesForTab(activeTab);
+      const index = tabModules.findIndex((item) => item.id === mod.id);
+      const previous = index > 0 ? tabModules[index - 1] : null;
+      Alert.alert(
+        "🔒 Locked",
+        previous ? `Complete \"${previous.title}\" to unlock this.` : "Complete the previous lesson first.",
+        [{ text: "Got it" }]
+      );
+      return;
+    }
+
+    if (!mod.hasRealLesson) {
+      const message = nodeState === "available"
+        ? `You've unlocked ${mod.title}! This lesson is coming soon.`
+        : `${mod.title} is on its way — keep playing!`;
+      Alert.alert("🚧 Coming Soon", message, [{ text: "OK" }]);
+      return;
+    }
+
+    setSelectedModule(mod);
+    setScreen("landing");
+  }
+
+  function handleLessonBack() {
+    if (selectedModule) {
+      recordCompletion(selectedModule.id, 1);
+    }
+    setScreen("path");
+  }
+
+  function handlePracticeBack() {
+    if (selectedModule) {
+      recordCompletion(selectedModule.id, 1);
+    }
+    setScreen("path");
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
-      {screen === "landing" ? (
-        <LandingScreen onStart={() => setScreen("lesson")} onTune={() => setScreen("tuning")} />
+      {screen === "path" ? (
+        <>
+          <PathScreen
+            modules={currentModules}
+            tabConfig={currentTabConfig}
+            completedModules={completedModules}
+            onSelectModule={handleSelectModule}
+          />
+          <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
+        </>
+      ) : screen === "landing" ? (
+        <LandingScreen
+          onLesson={() => setScreen("lesson")}
+          onPractice={() => setScreen("practice")}
+          onTune={() => setScreen("tuning")}
+          onBack={() => setScreen("path")}
+        />
       ) : screen === "tuning" ? (
         <TuningScreen onBack={() => setScreen("landing")} />
+      ) : screen === "practice" ? (
+        <StringPractice onBack={handlePracticeBack} />
       ) : (
-        <LessonScreen onBack={() => setScreen("landing")} />
+        <LessonScreen onBack={handleLessonBack} />
       )}
       <StatusBar style="light" />
     </SafeAreaView>
   );
 }
+
+const pathSt = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1E1E1E"
+  },
+  worldLabel: {
+    color: COLORS.softGold,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 2
+  },
+  worldTitle: {
+    color: COLORS.white,
+    fontSize: 20,
+    fontWeight: "700",
+    marginTop: 2
+  },
+  starsBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#1A1A1A",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6
+  },
+  starIcon: {
+    color: COLORS.softGold,
+    fontSize: 16
+  },
+  starsCount: {
+    color: COLORS.white,
+    fontWeight: "700",
+    fontSize: 14
+  }
+});
+
+const tabSt = StyleSheet.create({
+  bar: {
+    flexDirection: "row",
+    backgroundColor: "#0D0D0D",
+    borderTopWidth: 1,
+    borderTopColor: "#1E1E1E",
+    paddingBottom: 4
+  },
+  tab: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 10,
+    position: "relative"
+  },
+  indicator: {
+    position: "absolute",
+    top: 0,
+    left: "25%",
+    right: "25%",
+    height: 2,
+    backgroundColor: COLORS.softGold,
+    borderRadius: 1
+  },
+  tabEmoji: {
+    fontSize: 20,
+    opacity: 0.4
+  },
+  tabEmojiActive: {
+    opacity: 1
+  },
+  tabLabel: {
+    marginTop: 3,
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#555"
+  },
+  tabLabelActive: {
+    color: COLORS.softGold
+  }
+});
 
 const styles = StyleSheet.create({
   safe: {
@@ -1457,9 +2007,19 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg
   },
   screen: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 16,
     paddingBottom: 20
+  },
+  backButton: {
+    marginTop: 8,
+    marginBottom: 4,
+    alignSelf: "flex-start"
+  },
+  backButtonText: {
+    color: COLORS.softGold,
+    fontWeight: "600",
+    fontSize: 15
   },
   hero: {
     marginTop: 18,
@@ -1497,6 +2057,55 @@ const styles = StyleSheet.create({
   },
   lessonCardMeta: {
     color: "#EFEFEF"
+  },
+  modulesHeading: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontWeight: "700",
+    marginTop: 28,
+    marginBottom: 12
+  },
+  moduleCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#1e1e1e",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    gap: 12
+  },
+  moduleEmoji: {
+    fontSize: 28,
+    marginTop: 2
+  },
+  moduleBody: {
+    flex: 1,
+    gap: 4
+  },
+  moduleTitle: {
+    color: COLORS.white,
+    fontWeight: "700",
+    fontSize: 15
+  },
+  moduleDesc: {
+    color: "#ADADAD",
+    fontSize: 13,
+    lineHeight: 18
+  },
+  moduleTip: {
+    color: "#666",
+    fontSize: 11
+  },
+  moduleBtn: {
+    backgroundColor: COLORS.softGold,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    alignSelf: "center"
+  },
+  moduleBtnText: {
+    color: COLORS.black,
+    fontWeight: "700"
   },
   primaryButton: {
     marginTop: 12,
@@ -1554,6 +2163,85 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 20,
     fontWeight: "700"
+  },
+  fretboard: {
+    marginTop: 16,
+    borderRadius: 14,
+    overflow: "hidden"
+  },
+  fretboardBg: {
+    backgroundColor: "#1a0e05"
+  },
+  fretDecor: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: "#ffffff14"
+  },
+  stringTrack: {
+    position: "absolute",
+    left: 0,
+    right: 0
+  },
+  strLabel: {
+    position: "absolute",
+    left: 4,
+    width: 24,
+    height: 20,
+    borderRadius: 4,
+    backgroundColor: "#2d1a06",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10
+  },
+  strLabelText: {
+    color: "#c4913a",
+    fontSize: 10,
+    fontWeight: "800"
+  },
+  strumLine: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: `${COLORS.softGold}cc`,
+    zIndex: 5
+  },
+  strumBall: {
+    position: "absolute",
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: COLORS.softGold,
+    zIndex: 6
+  },
+  chordBlock: {
+    position: "absolute",
+    borderRadius: 7,
+    borderWidth: 1.5,
+    alignItems: "center",
+    zIndex: 4
+  },
+  chordLabelAbove: {
+    position: "absolute",
+    top: 5,
+    width: BLOCK_W,
+    textAlign: "center",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    zIndex: 8
+  },
+  chordDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5
+  },
+  chordMuteX: {
+    color: "#555",
+    fontSize: 13,
+    fontWeight: "900"
   },
   timelineFrame: {
     marginTop: 16,
@@ -1749,6 +2437,76 @@ const styles = StyleSheet.create({
   stringIndicatorLabel: {
     color: "#9f9f9f",
     fontSize: 9
+  },
+  stringBoardWrap: {
+    marginTop: 10,
+    gap: 6
+  },
+  stringBoardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 40,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    gap: 8,
+    backgroundColor: "#151515"
+  },
+  stringBoardRowActive: {
+    backgroundColor: "#1e1c00"
+  },
+  stringBoardLabelBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: "#555",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#1a1a1a"
+  },
+  stringBoardLabelBoxActive: {
+    borderColor: COLORS.softGold
+  },
+  stringBoardLabel: {
+    color: "#9f9f9f",
+    fontWeight: "800",
+    fontSize: 13
+  },
+  stringBoardLabelActive: {
+    color: COLORS.softGold
+  },
+  stringBoardTrack: {
+    flex: 1,
+    justifyContent: "center",
+    position: "relative"
+  },
+  stringBoardWire: {
+    borderRadius: 2
+  },
+  stringBoardPulse: {
+    position: "absolute",
+    left: 0,
+    top: "28%",
+    height: "44%",
+    width: "100%",
+    backgroundColor: "#F7DB7544",
+    borderRadius: 2
+  },
+  stringBoardStatus: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#444",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  stringBoardStatusActive: {
+    backgroundColor: COLORS.softGold
+  },
+  stringBoardStatusIcon: {
+    color: COLORS.black,
+    fontSize: 12,
+    fontWeight: "800"
   },
   tunerDisplay: {
     marginTop: 20,
