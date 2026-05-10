@@ -1,0 +1,288 @@
+# Source: context/Zero To Kumziz_ final project files 3/Brand Guidelines/Zero To Kumziz_Brand Guidelines.pdf
+
+# Pages: 26
+
+
+
+## Page 1
+
+Brand Guidelines Zeri T o Kumziz 2024
+BRAND
+GUIDELINES
+
+## Page 2
+
+Brand Guidelines Contents Page 01
+CONTENTS
+Logo01. 02
+Usage Guides02. 10
+Color Palette03. 14
+Typ o g ra p hy04. 16
+Iconography05. 20
+Do’s and Don’ts06. 22
+
+## Page 3
+
+Brand Guidelines Content 01 Page 02
+LOGO
+
+## Page 4
+
+Brand Guidelines Logo Page 03
+Our main logo is the cornerstone of our brand identity, representing the essence of who we are. Carefully crafted with precision and purpose, it embodies the values 
+that deﬁne us. The distinctive design and harmonious color palette make our main logo instantly recognizable, symbolizing the strength and uniqueness that sets us 
+apart in the market.
+Primary
+Logo
+
+## Page 5
+
+Our logo seamlessly integrates with different color environments. The logo maintains its clarity and impact, ensuring a strong and consistent brand presence across 
+diverse contexts. 
+Color
+V ersions
+Brand Guidelines Logo Page 04
+
+## Page 6
+
+Against a monochrome backdrop, our logo exude a timeless sophistication. The sleek contrast enhances their distinct features, allowing each element to stand out 
+with clarity and elegance. Whether in bold black or white, the logo maintain their impact, reinforcing a strong and uniﬁed brand identity.
+Monochrome
+V ersions
+Brand Guidelines Logo Page 05
+
+## Page 7
+
+A logo mark is a graphic symbol or icon that represents a brand, often used independently for quick and effective brand recognition.
+Logo
+Mark
+Brand Guidelines Logo Page 06
+
+## Page 8
+
+Mark color variations are different color versions of a logo mark, ensuring it remains effective and recognizable across various backgrounds and applications.
+Color
+V ersions
+Brand Guidelines Logo Page 07
+
+## Page 9
+
+Mark B/W variation is a black and white version of a logo mark, ensuring it remains clear and recognizable without color .
+Monochrome
+V ersions
+Brand Guidelines Logo Page 08
+
+## Page 10
+
+App icons are the visual representations of mobile applications, condensed into small, distinctive images that serve as entry points to the digital world of the app.
+App
+Icon
+Brand Guidelines Logo Page 09
+
+## Page 11
+
+Brand Guidelines Content 02 Page 10
+USAGE GUIDES
+
+## Page 12
+
+This clear space safeguards their visibility, ensuring no visual elements interfere. Adhere to these guidelines for a clean, impactful presentation, allowing our logo to 
+stand out distinctly.
+Exclusion
+Zone
+Brand Guidelines Usage Guidelines Page 11
+
+## Page 13
+
+To maintain visual impact and clarity, adhere to the recommended optimal sizes for our  logo. Whether in print or digital media, scaling within these dimensions 
+ensures legibility and prominence.
+Optimal
+Size
+Brand Guidelines Usage Guidelines Page 12
+ 380 px 235 px 145 px
+
+## Page 14
+
+Here you can see how potential partnerships would look. To ensure ﬂexibility, we created primary logo lockup. See below, how they were constructed.
+Co
+Branding
+Brand Guidelines Usage Guidelines Page 13
+
+## Page 15
+
+Brand Guidelines Content 03 Page 14
+COLOR P ALETTE
+
+## Page 16
+
+Brand Guidelines Color Palette Page 15
+Color plays an important role in the corporate identity program. The colors are recommendations for various media. Consistent use of these colors will contribute 
+to the cohesive and harmonious look of the  brand identity across all relevant media. Check with your designer or printer when using the corporate colors that they 
+will be always be consistent.
+Colors
+Soft Gold
+HEX: #F7DB75
+RGB: (247.219.117)
+CMYK: (3.10.65.0)
+Bronze Olive
+HEX: #F9F9F9
+RGB: (152.125.48)
+CMYK: (37.43.98.13)
+Dark Gray
+HEX: #4F4F4F
+RGB: (79.79.79)
+CMYK: (65.57.56.35)
+WHITE
+HEX: #FFFFFF
+RGB: (255.255.255)
+CMYK: (0.0.0.0)
+BLACK
+HEX: #000000
+RGB: (0.0.0)
+CMYK: (75.68.67.90)
+
+## Page 17
+
+Brand Guidelines Content 04 Page 16
+TYPOGRAPHY
+
+## Page 18
+
+Brand Guidelines T ypography Page 17
+The primary font is the main typeface used throughout a brand's communications, ensuring consistency and reinforcing the brand's identity.
+Primary
+T ypeface
+Red Hat Display
+Red Hat Display is a contemporary, open-source sans-serif typeface designed to create bold, eye-catching headlines, enhance branding, and deliver high-impact
+visuals with a professional and clean aesthetic.
+Light
+AaBbCcDdEeFfGgHhIiJj
+KkLlMmNnOoPpQqRrSs
+TtUuVvWwXxYyZz
+1234567890
+Regular
+AaBbCcDdEeFfGgHhIiJj
+KkLlMmNnOoPpQqRrSs
+TtUuVvWwXxYyZz
+1234567890
+Medium
+AaBbCcDdEeFfGgHhIiJj
+KkLlMmNnOoPpQqRrSs
+TtUuVvWwXxYyZz
+1234567890
+Semibold
+AaBbCcDdEeFfGgHhIiJj
+KkLlMmNnOoPpQqRrSs
+TtUuVvWwXxYyZz
+1234567890
+Bold
+AaBbCcDdEeFfGgHhIiJj
+KkLlMmNnOoPpQqRrSs
+TtUuVvWwXxYyZz
+1234567890
+Extrabold
+AaBbCcDdEeFfGgHhIiJj
+KkLlMmNnOoPpQqRrSs
+TtUuVvWwXxYyZz
+1234567890
+Aa Bb Cc 12
+Aa Bb Cc 12
+Aa Bb Cc 12
+Aa Bb Cc 12
+Aa Bb Cc 12
+Aa Bb Cc 12
+
+## Page 19
+
+Brand Guidelines T ypography Page 18
+The secondary font is an additional typeface used to complement the primary font, offering versatility and enhancing the overall brand aesthetic.
+Secondary
+T ypeface
+Outﬁt
+Outﬁt is a geometric sans serif typeface designed for versatility, making it suitable for headlines, general display purposes, and small amounts of text.
+ExtraLight
+AaBbCcDdEeFfGgHhIiJj
+KkLlMmNnOoPpQqRrSs
+TtUuVvWwXxY yZz
+1234567890
+Light
+AaBbCcDdEeFfGgHhIiJj
+KkLlMmNnOoPpQqRrSs
+TtUuVvWwXxY yZz
+1234567890
+Regular
+AaBbCcDdEeFfGgHhIiJj
+KkLlMmNnOoPpQqRrSs
+TtUuVvWwXxY yZz
+1234567890
+Medium
+AaBbCcDdEeFfGgHhIiJj
+KkLlMmNnOoPpQqRrSs
+TtUuVvWwXxY yZz
+1234567890
+Semibold
+AaBbCcDdEeFfGgHhIiJj
+KkLlMmNnOoPpQqRrSs
+TtUuVvWwXxY yZz
+1234567890
+Bold
+AaBbCcDdEeFfGgHhIiJj
+KkLlMmNnOoPpQqRrSs
+TtUuVvWwXxYyZz
+1234567890
+Aa Bb Cc 12
+Aa Bb Cc 12
+Aa Bb Cc 12
+Aa Bb Cc 12
+Aa Bb Cc 12
+Aa Bb Cc 12
+
+## Page 20
+
+It is important to organize typography in a hierarchical system according to relative importance or inclusiveness through scale and function on communication. You 
+can see how headlines, subheads and body copy are aligned.
+Hierarchy
+Brand Guidelines T ypography Page 19
+LOREM IPSUM H1
+Red Hat Display Bold AllCaps 72px
+Lorem Ipsum H2
+Red Hat Display Semibold 44.5px
+Lorem Ipsum Sub-Heading
+Outﬁt Medium 27.5px
+Lorem Ipsum Paragraph
+Outﬁt Regular 17px
+
+## Page 21
+
+Brand Guidelines Content 05 Page 20
+ICONOGRAPHY
+
+## Page 22
+
+Iconography refers to the use and design of icons to visually represent ideas, objects, actions, or concepts, enhancing communication and user experience through 
+simpliﬁed and recognizable symbols.
+Icons
+Brand Guidelines Iconography Page 21
+
+## Page 23
+
+Brand Guidelines Content 06 Page 22
+DO’S AND DON’TS
+
+## Page 24
+
+Do's are best practices and recommendations for using brand elements correctly to ensure consistency, clarity, and alignment with the brand's identity and 
+guidelines.
+Do’s
+Brand Guidelines Do’s and Don’ts Page 23
+
+## Page 25
+
+Don'ts are guidelines outlining actions and practices to avoid, ensuring the brand elements are used correctly and the brand's visual integrity is maintained.
+Don’ts
+Brand Guidelines Do’s and Don’ts Page 24
+
+## Page 26
+
+Brand Guidelines Zeri T o Kumziz 2024
+THANKS

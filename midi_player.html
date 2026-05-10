@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Guitar Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/midi-parser-js/3.0.3/midi-parser.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        input[type="file"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .display {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #007bff;
+        }
+        .status {
+            font-weight: bold;
+            color: #333;
+            margin: 10px 0;
+        }
+        .info {
+            font-size: 14px;
+            color: #666;
+            margin: 5px 0;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .slider-container {
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎸 MIDI Guitar Player</h1>
+        <p>Load a MIDI file and play it with realistic guitar sounds for testing.</p>
+        
+        <div class="controls">
+            <input type="file" id="midiFile" accept=".mid,.midi" />
+            <button id="playBtn" disabled>▶ Play</button>
+            <button id="pauseBtn" disabled>⏸ Pause</button>
+            <button id="stopBtn" disabled>⏹ Stop</button>
+        </div>
+
+        <div class="controls">
+            <label for="volumeSlider">Volume:</label>
+            <input type="range" id="volumeSlider" min="0" max="100" value="60" style="flex: 1; margin: 0 10px;" />
+            <span id="volumeValue">60%</span>
+        </div>
+
+        <div class="display">
+            <div class="status" id="status">Ready</div>
+            <div class="info" id="fileInfo"></div>
+            <div class="slider-container">
+                <input type="range" id="timeSlider" min="0" max="100" value="0" />
+                <div class="info">
+                    <span id="currentTime">0:00</span> / <span id="duration">0:00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info" style="margin-top: 20px; background: #e8f4f8; padding: 10px; border-radius: 4px;">
+            <strong>How to use:</strong>
+            <ol>
+                <li>Click "Choose File" and select the lesson MIDI file</li>
+                <li>Press "Play" to start playback with guitar sounds</li>
+                <li>Audio will come through your laptop speakers</li>
+                <li>Position microphone to capture the audio for testing</li>
+                <li>Sync with lesson playback by adjusting the slider</li>
+            </ol>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/soundfont-player/0.12.0/soundfont-player.min.js"></script>
+    <script>
+        let synth = null;
+        let currentNotes = new Map();
+        let isPlaying = false;
+        let isPaused = false;
+        let currentTime = 0;
+        let duration = 0;
+        let midiData = null;
+        let audioContext = null;
+        let midiNotes = [];
+        let noteStartTimes = [];
+        let playbackStartTime = 0;
+        let pausedTime = 0;
+
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const midiFileInput = document.getElementById('midiFile');
+        const statusDiv = document.getElementById('status');
+        const fileInfoDiv = document.getElementById('fileInfo');
+        const timeSlider = document.getElementById('timeSlider');
+        const currentTimeSpan = document.getElementById('currentTime');
+        const durationSpan = document.getElementById('duration');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeValue = document.getElementById('volumeValue');
+
+        // Initialize Web Audio
+        async function initAudio() {
+            if (audioContext) return;
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+        }
+
+        // Format time as mm:ss
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // Parse MIDI file
+        midiFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const arr = new Uint8Array(event.target.result);
+                    midiData = MidiParser.parse(arr);
+                    
+                    // Extract notes and timing
+                    midiNotes = [];
+                    extractNotes(midiData);
+                    
+                    if (duration > 0) {
+                        timeSlider.max = Math.ceil(duration * 10);
+                    }
+                    
+                    fileInfoDiv.innerHTML = `Loaded: ${file.name}<br/>Duration: ${formatTime(duration)}<br/>Notes: ${midiNotes.length}`;
+                    statusDiv.innerHTML = 'File loaded. Ready to play.';
+                    playBtn.disabled = false;
+                    durationSpan.textContent = formatTime(duration);
+                } catch (err) {
+                    statusDiv.innerHTML = `Error: ${err.message}`;
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // Extract notes from MIDI
+        function extractNotes(midi) {
+            midiNotes = [];
+            duration = 0;
+            let currentTime = 0;
+
+            midi.tracks.forEach(track => {
+                currentTime = 0;
+                track.forEach(event => {
+                    currentTime += event.deltaTime;
+                    
+                    if (event.type === 'noteOn' && event.velocity > 0) {
+                        midiNotes.push({
+                            note: event.noteNumber,
+                            velocity: event.velocity,
+                            time: currentTime / 480, // MIDI uses 480 ticks per beat, convert to beat time
+                            duration: 0.5 // Default note duration
+                        });
+                        duration = Math.max(duration, currentTime / 480);
+                    }
+                });
+            });
+
+            // Convert beat time to seconds (assuming 120 BPM)
+            const bpm = 120;
+            const beatDuration = 60 / bpm;
+            midiNotes.forEach(note => {
+                note.time *= beatDuration;
+            });
+            duration *= beatDuration;
+        }
+
+        // Load soundfont and create synth
+        async function loadGuitar() {
+            await initAudio();
+            try {
+                statusDiv.innerHTML = 'Loading guitar soundfont...';
+                const ac = audioContext;
+                const instrument = await Soundfont.instrument(ac, 'acoustic_guitar_nylon');
+                synth = instrument;
+                statusDiv.innerHTML = 'Guitar loaded. Press Play.';
+                return true;
+            } catch (err) {
+                statusDiv.innerHTML = `Error loading guitar: ${err.message}`;
+                return false;
+            }
+        }
+
+        // Play MIDI
+        playBtn.addEventListener('click', async () => {
+            if (!midiData) {
+                statusDiv.innerHTML = 'Load a MIDI file first.';
+                return;
+            }
+
+            if (!synth) {
+                const loaded = await loadGuitar();
+                if (!loaded) return;
+            }
+
+            if (isPaused) {
+                // Resume from pause
+                isPaused = false;
+                playbackStartTime = Date.now() - pausedTime * 1000;
+            } else {
+                // Start new playback
+                currentTime = 0;
+                playbackStartTime = Date.now();
+                pausedTime = 0;
+            }
+
+            isPlaying = true;
+            playBtn.disabled = true;
+            pauseBtn.disabled = false;
+            stopBtn.disabled = false;
+            statusDiv.innerHTML = '▶ Playing...';
+
+            playLoop();
+        });
+
+        // Pause playback
+        pauseBtn.addEventListener('click', () => {
+            isPlaying = false;
+            isPaused = true;
+            pausedTime = currentTime;
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+            stopBtn.disabled = false;
+            statusDiv.innerHTML = '⏸ Paused';
+
+            // Stop all playing notes
+            currentNotes.forEach(note => {
+                if (synth && synth.stop) {
+                    synth.stop(note);
+                }
+            });
+            currentNotes.clear();
+        });
+
+        // Stop playback
+        stopBtn.addEventListener('click', () => {
+            isPlaying = false;
+            isPaused = false;
+            currentTime = 0;
+            playbackStartTime = 0;
+            pausedTime = 0;
+            timeSlider.value = 0;
+            currentTimeSpan.textContent = '0:00';
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+            stopBtn.disabled = true;
+            statusDiv.innerHTML = 'Stopped';
+
+            // Stop all playing notes
+            currentNotes.forEach(note => {
+                if (synth && synth.stop) {
+                    synth.stop(note);
+                }
+            });
+            currentNotes.clear();
+        });
+
+        // Volume control
+        volumeSlider.addEventListener('input', (e) => {
+            const vol = e.target.value;
+            volumeValue.textContent = vol + '%';
+            if (synth && synth.volume) {
+                synth.volume.value = -40 + (vol / 100) * 40; // Map 0-100 to -40 to 0 dB
+            }
+        });
+
+        // Time slider for scrubbing
+        timeSlider.addEventListener('input', (e) => {
+            if (isPlaying) return;
+            currentTime = (e.target.value / 10);
+            currentTimeSpan.textContent = formatTime(currentTime);
+            pausedTime = currentTime;
+        });
+
+        // Main playback loop
+        function playLoop() {
+            if (!isPlaying) return;
+
+            currentTime = (Date.now() - playbackStartTime) / 1000;
+
+            if (currentTime >= duration) {
+                // End of playback
+                isPlaying = false;
+                isPaused = false;
+                stopBtn.click();
+                return;
+            }
+
+            timeSlider.value = Math.floor(currentTime * 10);
+            currentTimeSpan.textContent = formatTime(currentTime);
+
+            // Play all notes that should start now
+            midiNotes.forEach(note => {
+                const noteId = note.time + '_' + note.note;
+                
+                if (note.time <= currentTime && note.time + 0.1 > currentTime && !currentNotes.has(noteId)) {
+                    if (synth && synth.play) {
+                        const velocity = (note.velocity / 127) * 0.7; // Scale velocity to 0-0.7
+                        try {
+                            synth.play(note.note, audioContext.currentTime, { gain: velocity });
+                            currentNotes.set(noteId, true);
+                        } catch (err) {
+                            console.error('Error playing note:', err);
+                        }
+                    }
+                }
+            });
+
+            // Clean up old notes
+            const cutoffTime = currentTime - 2;
+            for (let [noteId, _] of currentNotes) {
+                const noteTime = parseFloat(noteId.split('_')[0]);
+                if (noteTime < cutoffTime) {
+                    currentNotes.delete(noteId);
+                }
+            }
+
+            requestAnimationFrame(playLoop);
+        }
+
+        // Initialize volume
+        if (synth && synth.volume) {
+            synth.volume.value = -10;
+        }
+    </script>
+</body>
+</html>

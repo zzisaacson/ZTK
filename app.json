@@ -1,10 +1,28 @@
 {
   "expo": {
-    "name": "GuitarCoach",
-    "slug": "guitar-coach",
+    "name": "ZTK",
+    "slug": "ztk",
     "version": "1.0.0",
     "orientation": "portrait",
-    "platforms": ["ios", "android", "web"],
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Zero To Kumziz uses the microphone to detect guitar notes during lessons."
+      }
+    },
+    "android": {
+      "permissions": [
+        "RECORD_AUDIO"
+      ]
+    },
     "web": {
       "bundler": "metro"
     }
