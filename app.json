@@ -2,6 +2,7 @@
   "expo": {
     "name": "ZTK",
     "slug": "ztk",
+    "scheme": "ztk",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -27,7 +28,8 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-video"
+      "expo-video",
+      "expo-web-browser"
     ]
   }
 }

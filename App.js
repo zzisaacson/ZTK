@@ -5,18 +5,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
 import lessonData from "./src/data/lessons/em_am_test.json";
 import InstructionalVideo from "./src/components/InstructionalVideo";
 import StringPractice from "./src/components/StringPractice";
+import { supabase, createProfile, loadUserProgress, saveModuleProgress, unlockAchievement } from "./src/lib/supabase";
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 
@@ -1310,7 +1313,113 @@ function AchievementToast({ achievement, onDone, onPress }) {
   );
 }
 
+// ─── Auth screen ──────────────────────────────────────────────────────────────
+
+function AuthScreen() {
+  const [mode,        setMode]        = useState("signin");
+  const [email,       setEmail]       = useState("");
+  const [password,    setPassword]    = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState("");
+
+  async function handleEmailAuth() {
+    if (!email || !password) { setError("Please enter email and password."); return; }
+    setLoading(true);
+    setError("");
+    try {
+      if (mode === "signin") {
+        const { error: e } = await supabase.auth.signInWithPassword({ email, password });
+        if (e) throw e;
+      } else {
+        const { data, error: e } = await supabase.auth.signUp({ email, password });
+        if (e) throw e;
+        if (data.user) await createProfile(data.user, displayName, email);
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        style={authSt.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView contentContainerStyle={authSt.container} keyboardShouldPersistTaps="handled">
+          <Text style={authSt.logo}>🎸</Text>
+          <Text style={authSt.appName}>Zero To Kumziz</Text>
+          <Text style={authSt.tagline}>Start your guitar journey</Text>
+
+          <View style={authSt.toggleRow}>
+            <Pressable
+              style={[authSt.toggleBtn, mode === "signin" && authSt.toggleActive]}
+              onPress={() => { setMode("signin"); setError(""); }}
+            >
+              <Text style={[authSt.toggleText, mode === "signin" && authSt.toggleTextActive]}>Sign In</Text>
+            </Pressable>
+            <Pressable
+              style={[authSt.toggleBtn, mode === "signup" && authSt.toggleActive]}
+              onPress={() => { setMode("signup"); setError(""); }}
+            >
+              <Text style={[authSt.toggleText, mode === "signup" && authSt.toggleTextActive]}>Create Account</Text>
+            </Pressable>
+          </View>
+
+          {mode === "signup" && (
+            <TextInput
+              style={authSt.input}
+              placeholder="Your name"
+              placeholderTextColor="#555"
+              value={displayName}
+              onChangeText={setDisplayName}
+              autoCapitalize="words"
+            />
+          )}
+
+          <TextInput
+            style={authSt.input}
+            placeholder="Email"
+            placeholderTextColor="#555"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          <TextInput
+            style={authSt.input}
+            placeholder="Password"
+            placeholderTextColor="#555"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+
+          {!!error && <Text style={authSt.errorText}>{error}</Text>}
+
+          <Pressable
+            style={[authSt.primaryBtn, loading && authSt.btnDisabled]}
+            onPress={handleEmailAuth}
+            disabled={loading}
+          >
+            <Text style={authSt.primaryBtnText}>
+              {loading ? "…" : mode === "signin" ? "Sign In" : "Create Account"}
+            </Text>
+          </Pressable>
+
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
 export default function App() {
+  const [session,          setSession]          = useState(undefined);
   const [screen,           setScreen]           = useState("path");
   const [activeTab,        setActiveTab]        = useState("learn");
   const [selectedModule,   setSelectedModule]   = useState(null);
@@ -1319,6 +1428,27 @@ export default function App() {
   const [sessionCount,     setSessionCount]     = useState(0);
   const [earnedIds,        setEarnedIds]        = useState(new Set());
   const [toastAch,         setToastAch]         = useState(null);
+  const [progLoaded,       setProgLoaded]       = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    setProgLoaded(false);
+    loadUserProgress(session.user.id).then(({ completedModules: cm, earnedIds: ei, sessionCount: sc }) => {
+      setCompletedModules(cm);
+      setEarnedIds(ei);
+      setSessionCount(sc);
+      setProgLoaded(true);
+    });
+  }, [session?.user?.id]);
+
+  if (session === undefined || (session && !progLoaded)) return null;
+  if (!session) return <AuthScreen />;
 
   const isPathTab = ["learn", "workouts", "songs"].includes(activeTab);
 
@@ -1351,18 +1481,24 @@ export default function App() {
   }
 
   function recordCompletion(moduleId, stars) {
-    setCompletedModules(prev => {
-      const next = { ...prev, [moduleId]: { stars: Math.max(stars, prev[moduleId]?.stars || 0) } };
-      // Check for newly unlocked achievements
-      const newAchs = computeAchievements(next, sessionCount + 1, 0);
-      const newlyEarned = newAchs.find(a => a.earned && !earnedIds.has(a.id));
-      if (newlyEarned) {
-        setEarnedIds(s => { const n = new Set(s); n.add(newlyEarned.id); return n; });
-        setToastAch(newlyEarned);
-      }
-      return next;
-    });
-    setSessionCount(prev => prev + 1);
+    const newStars      = Math.max(stars, completedModules[moduleId]?.stars || 0);
+    const next          = { ...completedModules, [moduleId]: { stars: newStars } };
+    const newCount      = sessionCount + 1;
+    const newAchs       = computeAchievements(next, newCount, 0);
+    const newlyEarned   = newAchs.find(a => a.earned && !earnedIds.has(a.id));
+
+    setCompletedModules(next);
+    setSessionCount(newCount);
+    if (newlyEarned) {
+      setEarnedIds(s => { const n = new Set(s); n.add(newlyEarned.id); return n; });
+      setToastAch(newlyEarned);
+    }
+
+    const uid = session?.user?.id;
+    if (uid) {
+      saveModuleProgress(uid, moduleId, newStars, newCount);
+      if (newlyEarned) unlockAchievement(uid, newlyEarned.id);
+    }
   }
 
   function handleLessonFinish(stats) {
@@ -1687,4 +1823,32 @@ const achModalSt = StyleSheet.create({
   closeBtn:    { marginTop: 16, borderWidth: 1.5, borderColor: C.bronze, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 44 },
   closeBtnEarned:  { backgroundColor: C.gold, borderColor: C.gold },
   closeBtnText:    { color: C.gold, fontWeight: "700", fontSize: 15 },
+});
+
+// ─── Auth screen styles ───────────────────────────────────────────────────────
+
+const authSt = StyleSheet.create({
+  flex:       { flex: 1 },
+  container:  { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, paddingVertical: 48 },
+  logo:       { fontSize: 56, marginBottom: 12 },
+  appName:    { color: C.white, fontSize: 26, fontWeight: "800", marginBottom: 6, textAlign: "center" },
+  tagline:    { color: "#888", fontSize: 14, marginBottom: 36, textAlign: "center" },
+  toggleRow:  { flexDirection: "row", backgroundColor: "#1C1C1C", borderRadius: 12, padding: 4, marginBottom: 24, width: "100%" },
+  toggleBtn:  { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center" },
+  toggleActive:     { backgroundColor: C.gold },
+  toggleText:       { color: "#888", fontWeight: "600", fontSize: 14 },
+  toggleTextActive: { color: C.black, fontWeight: "700" },
+  input: {
+    width: "100%", backgroundColor: "#1C1C1C", borderRadius: 12,
+    borderWidth: 1, borderColor: "#2A2A2A",
+    color: C.white, fontSize: 15, paddingHorizontal: 16, paddingVertical: 14,
+    marginBottom: 12,
+  },
+  errorText:  { color: "#E05C5C", fontSize: 13, marginBottom: 10, textAlign: "center" },
+  primaryBtn: {
+    width: "100%", backgroundColor: C.gold, borderRadius: 14,
+    paddingVertical: 15, alignItems: "center", marginTop: 4, marginBottom: 8,
+  },
+  btnDisabled:    { opacity: 0.5 },
+  primaryBtnText: { color: C.black, fontWeight: "800", fontSize: 16 },
 });

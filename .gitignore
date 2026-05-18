@@ -5,3 +5,6 @@ web-build
 npm-debug.*
 .DS_Store
 /.vendor
+.env
+.env.local
+supabase/.temp/
